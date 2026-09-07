@@ -7,9 +7,9 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
     body { background: #0f172a; color: #f8fafc; padding: 16px; display: flex; justify-content: center; }
-    .container { width: 100%; max-width: 600px; }
+    .container { width: 100%; max-width: 650px; }
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    h1 { font-size: 1.2rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    h1 { font-size: 1.25rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
     .status { color: #4ade80; font-size: 0.85rem; font-weight: 500; }
     
     .card { 
@@ -18,14 +18,20 @@
       padding: 12px; 
       margin-bottom: 12px; 
       display: flex; 
-      align-items: center; 
-      gap: 12px; 
+      flex-direction: column;
+      gap: 10px;
       border: 1px solid #334155;
+    }
+
+    .card-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
     
     .thumb-wrapper {
-      width: 54px;
-      height: 54px;
+      width: 60px;
+      height: 60px;
       border-radius: 8px;
       overflow: hidden;
       background: #0b0f19;
@@ -38,9 +44,6 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-    }
-    .thumb-fallback {
-      font-size: 1.4rem;
     }
 
     .info { 
@@ -59,18 +62,39 @@
     }
     .size { font-size: 0.8rem; color: #94a3b8; }
     
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+      align-items: center;
+    }
     .btn { 
-      background: #0284c7; 
       color: white; 
       border: none; 
-      padding: 8px 16px; 
-      border-radius: 8px; 
+      padding: 7px 12px; 
+      border-radius: 6px; 
       text-decoration: none; 
-      font-size: 0.85rem; 
+      font-size: 0.8rem; 
       font-weight: 600; 
-      flex-shrink: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    .btn:hover { background: #0369a1; }
+    .btn-download { background: #0284c7; }
+    .btn-download:hover { background: #0369a1; }
+    .btn-play { background: #10b981; }
+    .btn-play:hover { background: #059669; }
+    .btn-delete { background: #ef4444; }
+    .btn-delete:hover { background: #dc2626; }
+
+    .video-player {
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 8px;
+      display: none;
+      background: #000;
+    }
   </style>
 </head>
 <body>
@@ -83,6 +107,40 @@
   </div>
 
   <script>
+    async function deleteFile(messageId, elementId) {
+      if (!confirm('আপনি কি নিশ্চিত যে এই ফাইলটি চ্যানেল থেকে মুছে ফেলতে চান?')) return;
+
+      try {
+        const res = await fetch('/api/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messageId })
+        });
+        const result = await res.json();
+        if (result.success) {
+          const card = document.getElementById(elementId);
+          if (card) card.remove();
+        } else {
+          alert('মুছতে ব্যর্থ হয়েছে। বট চ্যানেলের অ্যাডমিন কিনা চেক করুন।');
+        }
+      } catch (e) {
+        alert('সার্ভারে যোগাযোগ করা যায়নি।');
+      }
+    }
+
+    function togglePlay(btn, videoId) {
+      const video = document.getElementById(videoId);
+      if (video.style.display === 'block') {
+        video.pause();
+        video.style.display = 'none';
+        btn.innerText = 'Play';
+      } else {
+        video.style.display = 'block';
+        video.play();
+        btn.innerText = 'Close';
+      }
+    }
+
     async function loadFiles() {
       try {
         const res = await fetch('/api/files');
@@ -95,24 +153,44 @@
           return;
         }
 
-        data.files.forEach(f => {
+        data.files.forEach((f, idx) => {
+          const cardId = `card-${idx}`;
+          const videoId = `video-${idx}`;
+
           let thumbHTML = '';
           if (f.thumbId) {
             thumbHTML = `<img src="/thumb/${f.thumbId}" alt="thumb" loading="lazy" onerror="this.parentElement.innerHTML='📁'">`;
           } else {
-            thumbHTML = `<span class="thumb-fallback">${f.type === 'video' ? '🎬' : '📁'}</span>`;
+            thumbHTML = `<span style="font-size: 1.5rem;">${f.type === 'video' ? '🎬' : '📁'}</span>`;
+          }
+
+          let playButton = '';
+          let videoTag = '';
+          if (f.type === 'video') {
+            playButton = `<button class="btn btn-play" onclick="togglePlay(this, '${videoId}')">Play</button>`;
+            videoTag = `<video id="${videoId}" class="video-player" controls preload="none">
+                          <source src="/stream/${f.id}" type="video/mp4">
+                          আপনার ব্রাউজার ভিডিও সমর্থন করে না।
+                        </video>`;
           }
 
           list.innerHTML += `
-            <div class="card">
-              <div class="thumb-wrapper">
-                ${thumbHTML}
+            <div class="card" id="${cardId}">
+              <div class="card-content">
+                <div class="thumb-wrapper">
+                  ${thumbHTML}
+                </div>
+                <div class="info">
+                  <span class="filename">${f.name}</span>
+                  <span class="size">${f.size}</span>
+                </div>
+                <div class="actions">
+                  ${playButton}
+                  <a class="btn btn-download" href="/download/${f.id}">Download</a>
+                  <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${cardId}')">Delete</button>
+                </div>
               </div>
-              <div class="info">
-                <span class="filename">${f.name}</span>
-                <span class="size">${f.size}</span>
-              </div>
-              <a class="btn" href="/download/${f.id}">Download</a>
+              ${videoTag}
             </div>
           `;
         });
