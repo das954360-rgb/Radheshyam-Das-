@@ -6,15 +6,70 @@
   <title>Telegram Cloud Vault</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
-    body { background: #0f172a; color: #f8fafc; padding: 20px; display: flex; justify-content: center; }
+    body { background: #0f172a; color: #f8fafc; padding: 16px; display: flex; justify-content: center; }
     .container { width: 100%; max-width: 600px; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    h1 { font-size: 1.25rem; font-weight: 700; color: #38bdf8; }
-    .card { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-    .info { display: flex; flex-direction: column; gap: 4px; }
-    .filename { font-weight: 600; font-size: 0.95rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    h1 { font-size: 1.2rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    .status { color: #4ade80; font-size: 0.85rem; font-weight: 500; }
+    
+    .card { 
+      background: #1e293b; 
+      border-radius: 12px; 
+      padding: 12px; 
+      margin-bottom: 12px; 
+      display: flex; 
+      align-items: center; 
+      gap: 12px; 
+      border: 1px solid #334155;
+    }
+    
+    .thumb-wrapper {
+      width: 54px;
+      height: 54px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0b0f19;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .thumb-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .thumb-fallback {
+      font-size: 1.4rem;
+    }
+
+    .info { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 4px; 
+      flex-grow: 1; 
+      min-width: 0; 
+    }
+    .filename { 
+      font-weight: 600; 
+      font-size: 0.95rem; 
+      overflow: hidden; 
+      text-overflow: ellipsis; 
+      white-space: nowrap; 
+    }
     .size { font-size: 0.8rem; color: #94a3b8; }
-    .btn { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 600; }
+    
+    .btn { 
+      background: #0284c7; 
+      color: white; 
+      border: none; 
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      text-decoration: none; 
+      font-size: 0.85rem; 
+      font-weight: 600; 
+      flex-shrink: 0;
+    }
     .btn:hover { background: #0369a1; }
   </style>
 </head>
@@ -22,34 +77,48 @@
   <div class="container">
     <header>
       <h1>☁️ Telegram Media Vault</h1>
-      <span style="color: #4ade80; font-size: 0.85rem;">● Online</span>
+      <span class="status">● Online</span>
     </header>
     <div id="fileList">লোডিং হচ্ছে...</div>
   </div>
 
   <script>
     async function loadFiles() {
-      const res = await fetch('/api/files');
-      const data = await res.json();
-      const list = document.getElementById('fileList');
-      list.innerHTML = '';
+      try {
+        const res = await fetch('/api/files');
+        const data = await res.json();
+        const list = document.getElementById('fileList');
+        list.innerHTML = '';
 
-      if (!data.files || data.files.length === 0) {
-        list.innerHTML = '<p style="color: #94a3b8; text-align: center;">কোনো ফাইল পাওয়া যায়নি</p>';
-        return;
-      }
+        if (!data.files || data.files.length === 0) {
+          list.innerHTML = '<p style="color: #94a3b8; text-align: center; margin-top: 30px;">কোনো ফাইল পাওয়া যায়নি</p>';
+          return;
+        }
 
-      data.files.forEach(f => {
-        list.innerHTML += `
-          <div class="card">
-            <div class="info">
-              <span class="filename">${f.name}</span>
-              <span class="size">${f.size}</span>
+        data.files.forEach(f => {
+          let thumbHTML = '';
+          if (f.thumbId) {
+            thumbHTML = `<img src="/thumb/${f.thumbId}" alt="thumb" loading="lazy" onerror="this.parentElement.innerHTML='📁'">`;
+          } else {
+            thumbHTML = `<span class="thumb-fallback">${f.type === 'video' ? '🎬' : '📁'}</span>`;
+          }
+
+          list.innerHTML += `
+            <div class="card">
+              <div class="thumb-wrapper">
+                ${thumbHTML}
+              </div>
+              <div class="info">
+                <span class="filename">${f.name}</span>
+                <span class="size">${f.size}</span>
+              </div>
+              <a class="btn" href="/download/${f.id}">Download</a>
             </div>
-            <a class="btn" href="/download/${f.id}">Download</a>
-          </div>
-        `;
-      });
+          `;
+        });
+      } catch (err) {
+        document.getElementById('fileList').innerHTML = '<p style="color: #f87171; text-align: center;">লোড করতে সমস্যা হয়েছে</p>';
+      }
     }
     loadFiles();
   </script>
