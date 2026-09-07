@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram Cloud Vault</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; padding: 20px; display: flex; justify-content: center; }
+    .container { width: 100%; max-width: 600px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    h1 { font-size: 1.25rem; font-weight: 700; color: #38bdf8; }
+    .card { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .info { display: flex; flex-direction: column; gap: 4px; }
+    .filename { font-weight: 600; font-size: 0.95rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .size { font-size: 0.8rem; color: #94a3b8; }
+    .btn { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 600; }
+    .btn:hover { background: #0369a1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>☁️ Telegram Media Vault</h1>
+      <span style="color: #4ade80; font-size: 0.85rem;">● Online</span>
+    </header>
+    <div id="fileList">লোডিং হচ্ছে...</div>
+  </div>
+
+  <script>
+    async function loadFiles() {
+      const res = await fetch('/api/files');
+      const data = await res.json();
+      const list = document.getElementById('fileList');
+      list.innerHTML = '';
+
+      if (!data.files || data.files.length === 0) {
+        list.innerHTML = '<p style="color: #94a3b8; text-align: center;">কোনো ফাইল পাওয়া যায়নি</p>';
+        return;
+      }
+
+      data.files.forEach(f => {
+        list.innerHTML += `
+          <div class="card">
+            <div class="info">
+              <span class="filename">${f.name}</span>
+              <span class="size">${f.size}</span>
+            </div>
+            <a class="btn" href="/download/${f.id}">Download</a>
+          </div>
+        `;
+      });
+    }
+    loadFiles();
+  </script>
+</body>
+</html>
