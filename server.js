@@ -15,18 +15,23 @@ if (CHANNEL_ID && !CHANNEL_ID.startsWith('@') && !CHANNEL_ID.startsWith('-100'))
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// সব মিডিয়া ফাইল আনা ও ক্যাশ স্বয়ংক্রিয়ভাবে ক্লিয়ার করা
+// টেলিগ্রামের আটকে থাকা পুরনো সমস্ত মেমরি একবারে ড্রপ/মুছে ফেলার ফাংশন
+async function flushTelegramQueue() {
+  try {
+    await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true`);
+    console.log('Old telegram pending updates completely purged.');
+  } catch (e) {
+    console.error('Purge error:', e.message);
+  }
+}
+flushTelegramQueue();
+
+// সব মিডিয়া ফাইল আনা
 app.get('/api/files', async (req, res) => {
   try {
     const response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates`);
     const updates = response.data.result || [];
 
-    // পুরনো আপডেট আটকে থাকা দূর করতে অফসেট কনফার্মেশন পাঠানো
-    if (updates.length > 0) {
-      const highestUpdateId = updates[updates.length - 1].update_id;
-      axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${highestUpdateId + 1}`).catch(() => {});
-    }
-    
     const mediaFiles = [];
     updates.forEach(u => {
       const msg = u.channel_post || u.message;
@@ -89,6 +94,16 @@ app.get('/api/files', async (req, res) => {
     res.json({ files: mediaFiles.reverse() });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch media' });
+  }
+});
+
+// সরাসরি ক্যাশ জোরপূর্বক মুছে ফেলার ম্যানুয়াল এন্ডপয়েন্ট
+app.get('/api/clear-cache', async (req, res) => {
+  try {
+    await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true`);
+    res.send('Success: All old stuck files cleared from memory! Go back to homepage.');
+  } catch (err) {
+    res.status(500).send('Error clearing cache');
   }
 });
 
