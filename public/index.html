@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -248,28 +248,30 @@
 
     <!-- PIN Unlock Screen for My space -->
     <div id="pinScreen" class="pin-box" style="display: none;">
-      <h3>My space লক করা আছে</h3>
-      <p>প্রবেশ করতে আপনার গোপন পিন দিন</p>
+      <h3>My space is Locked</h3>
+      <p>Enter your secret PIN to access</p>
       <div class="pin-input-group">
-        <input type="password" id="pinInput" class="pin-field" placeholder="পিন টাইপ করুন..." autocomplete="off">
+        <input type="password" id="pinInput" class="pin-field" placeholder="Enter PIN..." autocomplete="off">
         <button class="pin-submit-btn" onclick="verifyPin()">✔</button>
       </div>
-      <div id="pinError" class="pin-error">ভুল পিন! আবার চেষ্টা করুন।</div>
+      <div id="pinError" class="pin-error">Incorrect PIN! Please try again.</div>
     </div>
 
     <!-- Controls Bar -->
     <div class="controls-bar" id="controlsBar">
-      <span class="sort-label">সাজানোর নিয়ম:</span>
+      <span class="sort-label">Sort by:</span>
       <select class="sort-select" id="sortSelect" onchange="renderMediaList()">
-        <option value="newest">নতুন ফাইল আগে</option>
-        <option value="oldest">পুরনো ফাইল আগে</option>
-        <option value="size-desc">বড় সাইজ আগে</option>
-        <option value="size-asc">ছোট সাইজ আগে</option>
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+        <option value="name-asc">Name (A to Z)</option>
+        <option value="name-desc">Name (Z to A)</option>
+        <option value="size-desc">Largest Size</option>
+        <option value="size-asc">Smallest Size</option>
       </select>
     </div>
 
     <!-- Media List -->
-    <div id="mediaList">লোড হচ্ছে...</div>
+    <div id="mediaList">Loading files...</div>
   </div>
 
   <!-- Fullscreen Lightbox -->
@@ -333,7 +335,6 @@
       }
     }
 
-    // Enter চাপলেও যেন আনলক হয়
     document.getElementById('pinInput').addEventListener('keypress', function (e) {
       if (e.key === 'Enter') verifyPin();
     });
@@ -366,7 +367,7 @@
     }
 
     async function deleteFile(messageId, cardId) {
-      if (!confirm('আপনি কি নিশ্চিত যে এই ফাইলটি চ্যানেল থেকে ডিলিট করতে চান?')) return;
+      if (!confirm('Are you sure you want to delete this file from Telegram?')) return;
 
       try {
         const res = await fetch('/api/delete', {
@@ -379,10 +380,10 @@
           document.getElementById(cardId)?.remove();
           filesData = filesData.filter(f => f.messageId !== messageId);
         } else {
-          alert('মুছতে ব্যর্থ হয়েছে। বটের ডিলিট পারমিশন চেক করুন।');
+          alert('Failed to delete. Check bot admin rights.');
         }
       } catch (e) {
-        alert('সার্ভারে যোগাযোগ করা যায়নি।');
+        alert('Server communication error.');
       }
     }
 
@@ -390,14 +391,17 @@
       const list = document.getElementById('mediaList');
       const sortType = document.getElementById('sortSelect').value;
 
-      // ট্যাব অনুযায়ী ফিল্টার
       let displayList = filesData.filter(f => currentTab === 'myspace' ? f.isPrivate : !f.isPrivate);
 
       let sorted = [...displayList];
       if (sortType === 'newest') {
-        // লেটেস্ট অলরেডি আগে
+        // Already newest first
       } else if (sortType === 'oldest') {
         sorted.reverse();
+      } else if (sortType === 'name-asc') {
+        sorted.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      } else if (sortType === 'name-desc') {
+        sorted.sort((a, b) => b.name.localeCompare(a.name, undefined, { sensitivity: 'base' }));
       } else if (sortType === 'size-desc') {
         sorted.sort((a, b) => parseFloat(b.size) - parseFloat(a.size));
       } else if (sortType === 'size-asc') {
@@ -407,7 +411,7 @@
       list.innerHTML = '';
       if (sorted.length === 0) {
         list.innerHTML = `<p style="color: #94a3b8; text-align: center; margin-top: 30px;">
-          ${currentTab === 'myspace' ? 'My space-এ কোনো গোপন ফাইল নেই। (টেলিগ্রামে #myspace ক্যাপশন দিয়ে আপলোড করুন)' : 'কোনো ফাইল পাওয়া যায়নি'}
+          ${currentTab === 'myspace' ? 'No private files in My space yet. (Upload on Telegram with a dot "." at the end)' : 'No files found'}
         </p>`;
         return;
       }
@@ -471,7 +475,7 @@
         filesData = data.files || [];
         renderMediaList();
       } catch (err) {
-        document.getElementById('mediaList').innerHTML = '<p style="color: #f87171; text-align: center;">লোড করতে সমস্যা হয়েছে</p>';
+        document.getElementById('mediaList').innerHTML = '<p style="color: #f87171; text-align: center;">Failed to load media files</p>';
       }
     }
 
