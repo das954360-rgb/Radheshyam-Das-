@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 let CHANNEL_ID = process.env.CHANNEL_ID;
 
-// প্রাইভেট চ্যানেলের ক্ষেত্রে আইডি সংখ্যায় রূপান্তর নিশ্চিত করা
 if (CHANNEL_ID && !CHANNEL_ID.startsWith('@') && !CHANNEL_ID.startsWith('-100')) {
   CHANNEL_ID = '-100' + CHANNEL_ID;
 }
@@ -16,11 +15,17 @@ if (CHANNEL_ID && !CHANNEL_ID.startsWith('@') && !CHANNEL_ID.startsWith('-100'))
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// সব মিডিয়া ফাইল আনা
+// সব মিডিয়া ফাইল আনা ও ক্যাশ স্বয়ংক্রিয়ভাবে ক্লিয়ার করা
 app.get('/api/files', async (req, res) => {
   try {
     const response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates`);
     const updates = response.data.result || [];
+
+    // পুরনো আপডেট আটকে থাকা দূর করতে অফসেট কনফার্মেশন পাঠানো
+    if (updates.length > 0) {
+      const highestUpdateId = updates[updates.length - 1].update_id;
+      axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${highestUpdateId + 1}`).catch(() => {});
+    }
     
     const mediaFiles = [];
     updates.forEach(u => {
@@ -37,7 +42,6 @@ app.get('/api/files', async (req, res) => {
         displayName = rawCaption.slice(0, -1).trim();
       }
 
-      // সংশ্লিষ্ট মেসেজ যে চ্যাট থেকে এসেছে তার সঠিক আইডি
       const originChatId = msg.chat ? msg.chat.id : CHANNEL_ID;
 
       let fileData = null;
@@ -103,7 +107,7 @@ app.get('/thumb/:fileId', async (req, res) => {
   }
 });
 
-// স্ট্রিমিং এন্ডপয়েন্ট
+// ভিডিও স্ট্রিমিং এন্ডপয়েন্ট
 app.get('/stream/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
@@ -133,7 +137,7 @@ app.get('/download/:fileId', async (req, res) => {
   }
 });
 
-// সঠিক চ্যাট আইডি সহ ডিলিট রিকোয়েস্ট
+// ডিলিট মেসেজ API
 app.post('/api/delete', async (req, res) => {
   const { messageId, chatId } = req.body;
   if (!messageId) return res.status(400).json({ error: 'Message ID required' });
