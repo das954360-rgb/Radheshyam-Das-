@@ -8,8 +8,8 @@ const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 let CHANNEL_ID = process.env.CHANNEL_ID;
 
-// চ্যানেল আইডি ঠিক করা
-if (CHANNEL_ID && !CHANNEL_ID.startsWith('-100') && !CHANNEL_ID.startsWith('@')) {
+// প্রাইভেট চ্যানেলের ক্ষেত্রে আইডি সংখ্যায় রূপান্তর নিশ্চিত করা
+if (CHANNEL_ID && !CHANNEL_ID.startsWith('@') && !CHANNEL_ID.startsWith('-100')) {
   CHANNEL_ID = '-100' + CHANNEL_ID;
 }
 
@@ -37,43 +37,43 @@ app.get('/api/files', async (req, res) => {
         displayName = rawCaption.slice(0, -1).trim();
       }
 
+      // সংশ্লিষ্ট মেসেজ যে চ্যাট থেকে এসেছে তার সঠিক আইডি
+      const originChatId = msg.chat ? msg.chat.id : CHANNEL_ID;
+
       let fileData = null;
       if (msg.video) {
         const thumbId = msg.video.thumbnail ? msg.video.thumbnail.file_id : null;
-        const sizeMB = msg.video.file_size / (1024 * 1024);
         fileData = { 
           id: msg.video.file_id, 
           messageId: msg.message_id,
+          chatId: originChatId,
           thumbId: thumbId,
           name: displayName || msg.video.file_name || 'Video.mp4', 
-          size: sizeMB.toFixed(2) + ' MB', 
-          sizeBytes: msg.video.file_size,
+          size: (msg.video.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
           type: 'video',
           isPrivate: isPrivate
         };
       } else if (msg.photo) {
         const bestPhoto = msg.photo[msg.photo.length - 1];
-        const sizeMB = bestPhoto.file_size / (1024 * 1024);
         fileData = { 
           id: bestPhoto.file_id, 
           messageId: msg.message_id,
+          chatId: originChatId,
           thumbId: bestPhoto.file_id,
           name: displayName || 'Photo.jpg', 
-          size: sizeMB.toFixed(2) + ' MB', 
-          sizeBytes: bestPhoto.file_size,
+          size: (bestPhoto.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
           type: 'photo',
           isPrivate: isPrivate
         };
       } else if (msg.document) {
         const thumbId = msg.document.thumbnail ? msg.document.thumbnail.file_id : null;
-        const sizeMB = msg.document.file_size / (1024 * 1024);
         fileData = { 
           id: msg.document.file_id, 
           messageId: msg.message_id,
+          chatId: originChatId,
           thumbId: thumbId,
           name: displayName || msg.document.file_name || 'Document', 
-          size: sizeMB.toFixed(2) + ' MB', 
-          sizeBytes: msg.document.file_size,
+          size: (msg.document.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
           type: 'document',
           isPrivate: isPrivate
         };
@@ -82,7 +82,7 @@ app.get('/api/files', async (req, res) => {
       if (fileData) mediaFiles.push(fileData);
     });
 
-    res.json({ files: mediaFiles.reverse(), channelId: CHANNEL_ID });
+    res.json({ files: mediaFiles.reverse() });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch media' });
   }
@@ -114,7 +114,7 @@ app.get('/stream/:fileId', async (req, res) => {
     res.setHeader('Content-Type', 'video/mp4');
     stream.data.pipe(res);
   } catch (err) {
-    res.status(500).send('Streaming error or file exceeds 20MB limit');
+    res.status(500).send('Streaming error');
   }
 });
 
@@ -129,24 +129,27 @@ app.get('/download/:fileId', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
     stream.data.pipe(res);
   } catch (err) {
-    res.status(500).send('Error downloading file: Telegram Bot API limit is 20MB.');
+    res.status(500).send('Error downloading file');
   }
 });
 
-// ডিলিট মেসেজ API
+// সঠিক চ্যাট আইডি সহ ডিলিট রিকোয়েস্ট
 app.post('/api/delete', async (req, res) => {
-  const { messageId } = req.body;
+  const { messageId, chatId } = req.body;
   if (!messageId) return res.status(400).json({ error: 'Message ID required' });
 
+  const targetChatId = chatId || CHANNEL_ID;
+
   try {
-    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/deleteMessage`, {
-      chat_id: CHANNEL_ID,
+    const tgRes = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/deleteMessage`, {
+      chat_id: targetChatId,
       message_id: Number(messageId)
     });
-    res.json({ success: true });
+    res.json({ success: true, data: tgRes.data });
   } catch (err) {
-    console.error('Delete error:', err.response?.data || err.message);
-    res.status(500).json({ error: err.response?.data?.description || 'Failed to delete message' });
+    const tgError = err.response?.data?.description || err.message;
+    console.error('Delete error from Telegram:', tgError);
+    res.status(500).json({ success: false, error: tgError });
   }
 });
 
