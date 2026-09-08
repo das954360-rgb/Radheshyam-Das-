@@ -22,8 +22,18 @@ app.get('/api/files', async (req, res) => {
       const msg = u.channel_post || u.message;
       if (!msg) return;
 
-      const caption = msg.caption || '';
-      const isPrivate = caption.toLowerCase().includes('#myspace') || caption.toLowerCase().includes('#private');
+      const rawCaption = (msg.caption || '').trim();
+
+      // শর্ত: ক্যাপশন শুধু একটি ডট (.) হলে অথবা ক্যাপশনের একদম শেষে ডট (.) থাকলে My space-এ যাবে
+      const isPrivate = rawCaption === '.' || rawCaption.endsWith('.');
+
+      // নাম নির্ধারণ: ক্যাপশন থাকলে সেটাই ফাইলের নাম হবে (পেছনের ডট সরিয়ে সুন্দর দেখাবে), না থাকলে ডিফল্ট নাম
+      let displayName = rawCaption;
+      if (rawCaption === '.') {
+        displayName = ''; // শুধু ডট দিলে ফাইলের ডিফল্ট নাম থাকবে
+      } else if (rawCaption.endsWith('.')) {
+        displayName = rawCaption.slice(0, -1).trim(); // নামের শেষের ডট বাদ দিয়ে নাম দেখাবে
+      }
 
       let fileData = null;
       if (msg.video) {
@@ -32,7 +42,7 @@ app.get('/api/files', async (req, res) => {
           id: msg.video.file_id, 
           messageId: msg.message_id,
           thumbId: thumbId,
-          name: msg.video.file_name || 'Video.mp4', 
+          name: displayName || msg.video.file_name || 'Video.mp4', 
           size: (msg.video.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
           type: 'video',
           isPrivate: isPrivate
@@ -43,7 +53,7 @@ app.get('/api/files', async (req, res) => {
           id: bestPhoto.file_id, 
           messageId: msg.message_id,
           thumbId: bestPhoto.file_id,
-          name: 'Photo.jpg', 
+          name: displayName || 'Photo.jpg', 
           size: (bestPhoto.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
           type: 'photo',
           isPrivate: isPrivate
@@ -54,7 +64,7 @@ app.get('/api/files', async (req, res) => {
           id: msg.document.file_id, 
           messageId: msg.message_id,
           thumbId: thumbId,
-          name: msg.document.file_name || 'Document', 
+          name: displayName || msg.document.file_name || 'Document', 
           size: (msg.document.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
           type: 'document',
           isPrivate: isPrivate
@@ -85,7 +95,7 @@ app.get('/thumb/:fileId', async (req, res) => {
   }
 });
 
-// স্ট্রিমিং এন্ডপয়েন্ট
+// ভিডিও বা অডিও স্ট্রিমিং এন্ডপয়েন্ট
 app.get('/stream/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
@@ -100,7 +110,7 @@ app.get('/stream/:fileId', async (req, res) => {
   }
 });
 
-// ডাউনলোড এন্ডপয়েন্ট
+// ফাইল ডাউনলোড এন্ডপয়েন্ট
 app.get('/download/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
@@ -115,7 +125,7 @@ app.get('/download/:fileId', async (req, res) => {
   }
 });
 
-// ডিলিট মেসেজ API
+// চ্যানেল থেকে মেসেজ ডিলিট করার API
 app.post('/api/delete', async (req, res) => {
   const { messageId } = req.body;
   if (!messageId) return res.status(400).json({ error: 'Message ID required' });
