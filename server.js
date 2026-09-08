@@ -34,12 +34,12 @@ app.get('/api/files', async (req, res) => {
           type: 'video' 
         };
       } else if (msg.photo) {
-        const thumbPhoto = msg.photo[0];
+        // HD থাম্বনেইলের জন্য আসল হাই কোয়ালিটি ফটো নেওয়া হলো
         const bestPhoto = msg.photo[msg.photo.length - 1];
         fileData = { 
           id: bestPhoto.file_id, 
           messageId: msg.message_id,
-          thumbId: thumbPhoto.file_id,
+          thumbId: bestPhoto.file_id,
           name: 'Photo.jpg', 
           size: (bestPhoto.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
           type: 'photo' 
@@ -80,7 +80,7 @@ app.get('/thumb/:fileId', async (req, res) => {
   }
 });
 
-// ভিডিও বা অডিও অনলাইন দেখার জন্য স্ট্রিমিং এন্ডপয়েন্ট
+// ভিডিও বা ইমেজ লাইভ দেখার জন্য স্ট্রিমিং এন্ডপয়েন্ট
 app.get('/stream/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
