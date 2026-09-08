@@ -20,7 +20,7 @@
     h1 { font-size: 1.25rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
     .status { color: #4ade80; font-size: 0.85rem; font-weight: 600; }
 
-    /* Tabs Navigation */
+    /* Tabs */
     .tabs-bar {
       display: flex;
       gap: 10px;
@@ -66,7 +66,7 @@
       outline: none;
     }
 
-    /* PIN Lock Card */
+    /* PIN Box */
     .pin-box {
       background: #1e293b;
       border: 1px solid #334155;
@@ -75,16 +75,8 @@
       text-align: center;
       margin-top: 20px;
     }
-    .pin-box h3 {
-      font-size: 1.1rem;
-      color: #38bdf8;
-      margin-bottom: 6px;
-    }
-    .pin-box p {
-      font-size: 0.85rem;
-      color: #94a3b8;
-      margin-bottom: 16px;
-    }
+    .pin-box h3 { font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px; }
+    .pin-box p { font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px; }
     .pin-input-group {
       display: flex;
       justify-content: center;
@@ -113,11 +105,7 @@
       font-size: 1.2rem;
       font-weight: bold;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
-    .pin-submit-btn:hover { background: #059669; }
     .pin-error {
       color: #ef4444;
       font-size: 0.85rem;
@@ -182,9 +170,10 @@
       border-radius: 6px;
     }
 
+    /* Action Buttons */
     .action-buttons {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
       gap: 8px;
     }
     .btn {
@@ -202,11 +191,10 @@
       gap: 4px;
     }
     .btn-play { background: #10b981; color: white; }
-    .btn-play:hover { background: #059669; }
     .btn-download { background: #0284c7; color: white; }
-    .btn-download:hover { background: #0369a1; }
+    .btn-telegram { background: #2563eb; color: white; }
+    .btn-telegram:hover { background: #1d4ed8; }
     .btn-delete { background: #ef4444; color: white; }
-    .btn-delete:hover { background: #dc2626; }
 
     /* Lightbox */
     .lightbox-modal {
@@ -246,7 +234,7 @@
       <button class="tab-btn" id="tabMySpace" onclick="switchTab('myspace')">🔒 My space</button>
     </div>
 
-    <!-- PIN Unlock Screen for My space -->
+    <!-- PIN Screen -->
     <div id="pinScreen" class="pin-box" style="display: none;">
       <h3>My space is Locked</h3>
       <p>Enter your secret PIN to access</p>
@@ -366,7 +354,6 @@
       }
     }
 
-    // চ্যাট আইডি ও সঠিক এরর মেসেজ হ্যান্ডলিং সহ ডিলিট ফাংশন
     async function deleteFile(messageId, chatId, cardId) {
       if (!confirm('Are you sure you want to delete this file from Telegram?')) return;
 
@@ -381,7 +368,6 @@
           document.getElementById(cardId)?.remove();
           filesData = filesData.filter(f => f.messageId !== messageId);
         } else {
-          // টেলিগ্রামের দেওয়া আসল এরর দেখাবে
           alert('Telegram Error: ' + (result.error || 'Failed to delete'));
         }
       } catch (e) {
@@ -397,7 +383,7 @@
 
       let sorted = [...displayList];
       if (sortType === 'newest') {
-        // Newest first
+        // Default newest
       } else if (sortType === 'oldest') {
         sorted.reverse();
       } else if (sortType === 'name-asc') {
@@ -413,7 +399,7 @@
       list.innerHTML = '';
       if (sorted.length === 0) {
         list.innerHTML = `<p style="color: #94a3b8; text-align: center; margin-top: 30px;">
-          ${currentTab === 'myspace' ? 'No private files in My space yet. (Upload on Telegram with a dot "." at the end)' : 'No files found'}
+          ${currentTab === 'myspace' ? 'No files in My space yet. (Upload on Telegram ending with a dot ".")' : 'No files found'}
         </p>`;
         return;
       }
@@ -424,30 +410,57 @@
         const videoId = `video-${idx}`;
 
         let topMediaHTML = '';
-        let playBtnHTML = '';
+        let actionButtonsHTML = '';
 
         if (f.type === 'video') {
-          playBtnHTML = `<button class="btn btn-play" onclick="togglePlay(this, '${previewId}', '${videoId}')">▶ Play</button>`;
-          topMediaHTML = `
-            <div class="media-preview-container" id="${previewId}" onclick="document.querySelector('#${cardId} .btn-play').click()">
-              ${f.thumbId ? `<img src="/thumb/${f.thumbId}" alt="${f.name}">` : '<span class="fallback-icon">🎬</span>'}
-              <div style="position: absolute; background: rgba(0,0,0,0.6); padding: 12px 18px; border-radius: 50%; font-size: 1.5rem;">▶</div>
-            </div>
-            <video id="${videoId}" class="video-player" controls preload="none">
-              <source src="/stream/${f.id}" type="video/mp4">
-            </video>
-          `;
+          if (f.isOver20MB) {
+            // ২০ MB-এর বড় ভিডিও (মুভি) হলে টেলিগ্রাম ওপেন বাটন
+            topMediaHTML = `
+              <div class="media-preview-container" id="${previewId}" onclick="window.open('${f.tgLink}', '_blank')">
+                ${f.thumbId ? `<img src="/thumb/${f.thumbId}" alt="${f.name}">` : '<span class="fallback-icon">🎬</span>'}
+                <div style="position: absolute; background: rgba(0,0,0,0.65); padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">✈ Tap to Open Movie</div>
+              </div>
+            `;
+            actionButtonsHTML = `
+              <a class="btn btn-telegram" href="${f.tgLink}" target="_blank">✈ Open in Telegram</a>
+              <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
+            `;
+          } else {
+            // ২০ MB-এর ছোট হলে ব্রাউজারে ইন-বিল্ট প্লে ও ডাউনলোড
+            topMediaHTML = `
+              <div class="media-preview-container" id="${previewId}" onclick="document.querySelector('#${cardId} .btn-play').click()">
+                ${f.thumbId ? `<img src="/thumb/${f.thumbId}" alt="${f.name}">` : '<span class="fallback-icon">🎬</span>'}
+                <div style="position: absolute; background: rgba(0,0,0,0.6); padding: 12px 18px; border-radius: 50%; font-size: 1.5rem;">▶</div>
+              </div>
+              <video id="${videoId}" class="video-player" controls preload="none">
+                <source src="/stream/${f.id}" type="video/mp4">
+              </video>
+            `;
+            actionButtonsHTML = `
+              <button class="btn btn-play" onclick="togglePlay(this, '${previewId}', '${videoId}')">▶ Play</button>
+              <a class="btn btn-download" href="/download/${f.id}">⬇ Download</a>
+              <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
+            `;
+          }
         } else if (f.type === 'photo') {
           topMediaHTML = `
             <div class="media-preview-container" id="${previewId}" onclick="openImageViewer('/stream/${f.id}')">
               <img src="/thumb/${f.thumbId}" alt="${f.name}">
             </div>
           `;
+          actionButtonsHTML = `
+            <a class="btn btn-download" href="/download/${f.id}">⬇ Download</a>
+            <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
+          `;
         } else {
           topMediaHTML = `
             <div class="media-preview-container" id="${previewId}">
               <span class="fallback-icon">📁</span>
             </div>
+          `;
+          actionButtonsHTML = `
+            ${f.isOver20MB ? `<a class="btn btn-telegram" href="${f.tgLink}" target="_blank">✈ Open in Telegram</a>` : `<a class="btn btn-download" href="/download/${f.id}">⬇ Download</a>`}
+            <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
           `;
         }
 
@@ -460,9 +473,7 @@
                 <span class="filesize">${f.size}</span>
               </div>
               <div class="action-buttons">
-                ${playBtnHTML}
-                <a class="btn btn-download" href="/download/${f.id}">⬇ Download</a>
-                <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
+                ${actionButtonsHTML}
               </div>
             </div>
           </div>
@@ -477,7 +488,7 @@
         filesData = data.files || [];
         renderMediaList();
       } catch (err) {
-        document.getElementById('mediaList').innerHTML = '<p style="color: #f87171; text-align: center;">Failed to load media files</p>';
+        document.getElementById('mediaList').innerHTML = '<p style="color: #f87171; text-align: center;">Failed to load files</p>';
       }
     }
 
