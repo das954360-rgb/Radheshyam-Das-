@@ -6,12 +6,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const CHANNEL_ID = process.env.CHANNEL_ID;
+let CHANNEL_ID = process.env.CHANNEL_ID;
+
+// চ্যানেল আইডি ঠিক করা
+if (CHANNEL_ID && !CHANNEL_ID.startsWith('-100') && !CHANNEL_ID.startsWith('@')) {
+  CHANNEL_ID = '-100' + CHANNEL_ID;
+}
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// সব মিডিয়া ফাইল ফেচ করা
+// সব মিডিয়া ফাইল আনা
 app.get('/api/files', async (req, res) => {
   try {
     const response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates`);
@@ -23,49 +28,52 @@ app.get('/api/files', async (req, res) => {
       if (!msg) return;
 
       const rawCaption = (msg.caption || '').trim();
-
-      // শর্ত: ক্যাপশন শুধু একটি ডট (.) হলে অথবা ক্যাপশনের একদম শেষে ডট (.) থাকলে My space-এ যাবে
       const isPrivate = rawCaption === '.' || rawCaption.endsWith('.');
 
-      // নাম নির্ধারণ: ক্যাপশন থাকলে সেটাই ফাইলের নাম হবে (পেছনের ডট সরিয়ে সুন্দর দেখাবে), না থাকলে ডিফল্ট নাম
       let displayName = rawCaption;
       if (rawCaption === '.') {
-        displayName = ''; // শুধু ডট দিলে ফাইলের ডিফল্ট নাম থাকবে
+        displayName = '';
       } else if (rawCaption.endsWith('.')) {
-        displayName = rawCaption.slice(0, -1).trim(); // নামের শেষের ডট বাদ দিয়ে নাম দেখাবে
+        displayName = rawCaption.slice(0, -1).trim();
       }
 
       let fileData = null;
       if (msg.video) {
         const thumbId = msg.video.thumbnail ? msg.video.thumbnail.file_id : null;
+        const sizeMB = msg.video.file_size / (1024 * 1024);
         fileData = { 
           id: msg.video.file_id, 
           messageId: msg.message_id,
           thumbId: thumbId,
           name: displayName || msg.video.file_name || 'Video.mp4', 
-          size: (msg.video.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
+          size: sizeMB.toFixed(2) + ' MB', 
+          sizeBytes: msg.video.file_size,
           type: 'video',
           isPrivate: isPrivate
         };
       } else if (msg.photo) {
         const bestPhoto = msg.photo[msg.photo.length - 1];
+        const sizeMB = bestPhoto.file_size / (1024 * 1024);
         fileData = { 
           id: bestPhoto.file_id, 
           messageId: msg.message_id,
           thumbId: bestPhoto.file_id,
           name: displayName || 'Photo.jpg', 
-          size: (bestPhoto.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
+          size: sizeMB.toFixed(2) + ' MB', 
+          sizeBytes: bestPhoto.file_size,
           type: 'photo',
           isPrivate: isPrivate
         };
       } else if (msg.document) {
         const thumbId = msg.document.thumbnail ? msg.document.thumbnail.file_id : null;
+        const sizeMB = msg.document.file_size / (1024 * 1024);
         fileData = { 
           id: msg.document.file_id, 
           messageId: msg.message_id,
           thumbId: thumbId,
           name: displayName || msg.document.file_name || 'Document', 
-          size: (msg.document.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
+          size: sizeMB.toFixed(2) + ' MB', 
+          sizeBytes: msg.document.file_size,
           type: 'document',
           isPrivate: isPrivate
         };
@@ -74,7 +82,7 @@ app.get('/api/files', async (req, res) => {
       if (fileData) mediaFiles.push(fileData);
     });
 
-    res.json({ files: mediaFiles.reverse() });
+    res.json({ files: mediaFiles.reverse(), channelId: CHANNEL_ID });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch media' });
   }
@@ -95,7 +103,7 @@ app.get('/thumb/:fileId', async (req, res) => {
   }
 });
 
-// ভিডিও বা অডিও স্ট্রিমিং এন্ডপয়েন্ট
+// স্ট্রিমিং এন্ডপয়েন্ট
 app.get('/stream/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
@@ -106,11 +114,11 @@ app.get('/stream/:fileId', async (req, res) => {
     res.setHeader('Content-Type', 'video/mp4');
     stream.data.pipe(res);
   } catch (err) {
-    res.status(500).send('Streaming error');
+    res.status(500).send('Streaming error or file exceeds 20MB limit');
   }
 });
 
-// ফাইল ডাউনলোড এন্ডপয়েন্ট
+// ডাউনলোড এন্ডপয়েন্ট
 app.get('/download/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
@@ -121,11 +129,11 @@ app.get('/download/:fileId', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
     stream.data.pipe(res);
   } catch (err) {
-    res.status(500).send('Error downloading file');
+    res.status(500).send('Error downloading file: Telegram Bot API limit is 20MB.');
   }
 });
 
-// চ্যানেল থেকে মেসেজ ডিলিট করার API
+// ডিলিট মেসেজ API
 app.post('/api/delete', async (req, res) => {
   const { messageId } = req.body;
   if (!messageId) return res.status(400).json({ error: 'Message ID required' });
@@ -133,11 +141,12 @@ app.post('/api/delete', async (req, res) => {
   try {
     await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/deleteMessage`, {
       chat_id: CHANNEL_ID,
-      message_id: messageId
+      message_id: Number(messageId)
     });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to delete message' });
+    console.error('Delete error:', err.response?.data || err.message);
+    res.status(500).json({ error: err.response?.data?.description || 'Failed to delete message' });
   }
 });
 
