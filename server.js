@@ -15,7 +15,7 @@ if (CHANNEL_ID && !CHANNEL_ID.startsWith('@') && !CHANNEL_ID.startsWith('-100'))
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// টেলিগ্রামের ব্যাকলগ ক্যাশ ড্রপ করার ফাংশন
+// ব্যাকলগ ক্যাশ ড্রপ করার ফাংশন
 async function flushTelegramQueue() {
   try {
     await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true`);
@@ -36,8 +36,16 @@ app.get('/api/files', async (req, res) => {
       const msg = u.channel_post || u.message;
       if (!msg) return;
 
-      const rawCaption = (msg.caption || '').trim();
+      let rawCaption = (msg.caption || '').trim();
       const isPrivate = rawCaption === '.' || rawCaption.endsWith('.');
+
+      // ক্যাপশনের ভেতরের ডাইরেক্ট লিঙ্ক খোঁজা (যদি আপনি দেন)
+      let customDownloadUrl = '';
+      const urlMatch = rawCaption.match(/(https?:\/\/[^\s]+)/g);
+      if (urlMatch) {
+        customDownloadUrl = urlMatch[0];
+        rawCaption = rawCaption.replace(customDownloadUrl, '').trim();
+      }
 
       let displayName = rawCaption;
       if (rawCaption === '.') {
@@ -48,7 +56,7 @@ app.get('/api/files', async (req, res) => {
 
       const originChatId = msg.chat ? msg.chat.id : CHANNEL_ID;
 
-      // টেলিগ্রাম পোস্টের ডাইরেক্ট ডিপ-লিংক তৈরি
+      // টেলিগ্রাম পোস্ট লিংক
       let tgLink = '';
       if (msg.chat && msg.chat.username) {
         tgLink = `https://t.me/${msg.chat.username}/${msg.message_id}`;
@@ -66,6 +74,7 @@ app.get('/api/files', async (req, res) => {
           messageId: msg.message_id,
           chatId: originChatId,
           tgLink: tgLink,
+          customDownloadUrl: customDownloadUrl,
           thumbId: thumbId,
           name: displayName || msg.video.file_name || 'Video.mp4', 
           size: (sizeBytes / (1024 * 1024)).toFixed(2) + ' MB', 
@@ -81,6 +90,7 @@ app.get('/api/files', async (req, res) => {
           messageId: msg.message_id,
           chatId: originChatId,
           tgLink: tgLink,
+          customDownloadUrl: customDownloadUrl,
           thumbId: bestPhoto.file_id,
           name: displayName || 'Photo.jpg', 
           size: (sizeBytes / (1024 * 1024)).toFixed(2) + ' MB', 
@@ -96,6 +106,7 @@ app.get('/api/files', async (req, res) => {
           messageId: msg.message_id,
           chatId: originChatId,
           tgLink: tgLink,
+          customDownloadUrl: customDownloadUrl,
           thumbId: thumbId,
           name: displayName || msg.document.file_name || 'Document', 
           size: (sizeBytes / (1024 * 1024)).toFixed(2) + ' MB', 
@@ -114,7 +125,7 @@ app.get('/api/files', async (req, res) => {
   }
 });
 
-// ক্যাশ ফ্ল্যাশ এন্ডপয়েন্ট
+// ক্যাশ ফ্ল্যাশ
 app.get('/api/clear-cache', async (req, res) => {
   try {
     await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook?drop_pending_updates=true`);
@@ -139,7 +150,7 @@ app.get('/thumb/:fileId', async (req, res) => {
   }
 });
 
-// ২০ MB-এর নিচের ভিডিও স্ট্রিমিং
+// স্ট্রিমিং
 app.get('/stream/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
@@ -150,7 +161,7 @@ app.get('/stream/:fileId', async (req, res) => {
     res.setHeader('Content-Type', 'video/mp4');
     stream.data.pipe(res);
   } catch (err) {
-    res.status(500).send('File is too big or streaming error');
+    res.status(500).send('Streaming error');
   }
 });
 
@@ -165,7 +176,7 @@ app.get('/download/:fileId', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
     stream.data.pipe(res);
   } catch (err) {
-    res.status(500).send('Telegram API limit exceeded (Max 20MB)');
+    res.status(500).send('File limit exceeded');
   }
 });
 
