@@ -193,7 +193,6 @@
     .btn-play { background: #10b981; color: white; }
     .btn-download { background: #0284c7; color: white; }
     .btn-telegram { background: #2563eb; color: white; }
-    .btn-telegram:hover { background: #1d4ed8; }
     .btn-delete { background: #ef4444; color: white; }
 
     /* Lightbox */
@@ -383,7 +382,7 @@
 
       let sorted = [...displayList];
       if (sortType === 'newest') {
-        // Default newest
+        // default
       } else if (sortType === 'oldest') {
         sorted.reverse();
       } else if (sortType === 'name-asc') {
@@ -412,21 +411,24 @@
         let topMediaHTML = '';
         let actionButtonsHTML = '';
 
+        // বড় ফাইলের ডাইরেক্ট ডাউনলোড লিঙ্ক নির্ধারণ
+        const downloadUrl = f.customDownloadUrl ? f.customDownloadUrl : (f.isOver20MB ? f.tgLink : `/download/${f.id}`);
+        const isExternalDownload = f.customDownloadUrl || f.isOver20MB;
+
         if (f.type === 'video') {
           if (f.isOver20MB) {
-            // ২০ MB-এর বড় ভিডিও (মুভি) হলে টেলিগ্রাম ওপেন বাটন
             topMediaHTML = `
-              <div class="media-preview-container" id="${previewId}" onclick="window.open('${f.tgLink}', '_blank')">
+              <div class="media-preview-container" id="${previewId}" onclick="window.open('${f.customDownloadUrl || f.tgLink}', '_blank')">
                 ${f.thumbId ? `<img src="/thumb/${f.thumbId}" alt="${f.name}">` : '<span class="fallback-icon">🎬</span>'}
-                <div style="position: absolute; background: rgba(0,0,0,0.65); padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">✈ Tap to Open Movie</div>
+                <div style="position: absolute; background: rgba(0,0,0,0.65); padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;">✈ Open Movie</div>
               </div>
             `;
             actionButtonsHTML = `
-              <a class="btn btn-telegram" href="${f.tgLink}" target="_blank">✈ Open in Telegram</a>
+              <a class="btn btn-download" href="${downloadUrl}" ${isExternalDownload ? 'target="_blank"' : ''}>⬇ Download</a>
+              <a class="btn btn-telegram" href="${f.tgLink}" target="_blank">✈ Telegram</a>
               <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
             `;
           } else {
-            // ২০ MB-এর ছোট হলে ব্রাউজারে ইন-বিল্ট প্লে ও ডাউনলোড
             topMediaHTML = `
               <div class="media-preview-container" id="${previewId}" onclick="document.querySelector('#${cardId} .btn-play').click()">
                 ${f.thumbId ? `<img src="/thumb/${f.thumbId}" alt="${f.name}">` : '<span class="fallback-icon">🎬</span>'}
@@ -438,7 +440,7 @@
             `;
             actionButtonsHTML = `
               <button class="btn btn-play" onclick="togglePlay(this, '${previewId}', '${videoId}')">▶ Play</button>
-              <a class="btn btn-download" href="/download/${f.id}">⬇ Download</a>
+              <a class="btn btn-download" href="${downloadUrl}">⬇ Download</a>
               <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
             `;
           }
@@ -449,7 +451,7 @@
             </div>
           `;
           actionButtonsHTML = `
-            <a class="btn btn-download" href="/download/${f.id}">⬇ Download</a>
+            <a class="btn btn-download" href="${downloadUrl}">⬇ Download</a>
             <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
           `;
         } else {
@@ -459,7 +461,7 @@
             </div>
           `;
           actionButtonsHTML = `
-            ${f.isOver20MB ? `<a class="btn btn-telegram" href="${f.tgLink}" target="_blank">✈ Open in Telegram</a>` : `<a class="btn btn-download" href="/download/${f.id}">⬇ Download</a>`}
+            <a class="btn btn-download" href="${downloadUrl}" ${isExternalDownload ? 'target="_blank"' : ''}>⬇ Download</a>
             <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
           `;
         }
