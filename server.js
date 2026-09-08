@@ -22,6 +22,9 @@ app.get('/api/files', async (req, res) => {
       const msg = u.channel_post || u.message;
       if (!msg) return;
 
+      const caption = msg.caption || '';
+      const isPrivate = caption.toLowerCase().includes('#myspace') || caption.toLowerCase().includes('#private');
+
       let fileData = null;
       if (msg.video) {
         const thumbId = msg.video.thumbnail ? msg.video.thumbnail.file_id : null;
@@ -31,10 +34,10 @@ app.get('/api/files', async (req, res) => {
           thumbId: thumbId,
           name: msg.video.file_name || 'Video.mp4', 
           size: (msg.video.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
-          type: 'video' 
+          type: 'video',
+          isPrivate: isPrivate
         };
       } else if (msg.photo) {
-        // HD থাম্বনেইলের জন্য আসল হাই কোয়ালিটি ফটো নেওয়া হলো
         const bestPhoto = msg.photo[msg.photo.length - 1];
         fileData = { 
           id: bestPhoto.file_id, 
@@ -42,7 +45,8 @@ app.get('/api/files', async (req, res) => {
           thumbId: bestPhoto.file_id,
           name: 'Photo.jpg', 
           size: (bestPhoto.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
-          type: 'photo' 
+          type: 'photo',
+          isPrivate: isPrivate
         };
       } else if (msg.document) {
         const thumbId = msg.document.thumbnail ? msg.document.thumbnail.file_id : null;
@@ -52,7 +56,8 @@ app.get('/api/files', async (req, res) => {
           thumbId: thumbId,
           name: msg.document.file_name || 'Document', 
           size: (msg.document.file_size / (1024 * 1024)).toFixed(2) + ' MB', 
-          type: 'document' 
+          type: 'document',
+          isPrivate: isPrivate
         };
       }
 
@@ -80,7 +85,7 @@ app.get('/thumb/:fileId', async (req, res) => {
   }
 });
 
-// ভিডিও বা ইমেজ লাইভ দেখার জন্য স্ট্রিমিং এন্ডপয়েন্ট
+// স্ট্রিমিং এন্ডপয়েন্ট
 app.get('/stream/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
@@ -95,7 +100,7 @@ app.get('/stream/:fileId', async (req, res) => {
   }
 });
 
-// ফাইল ডাউনলোড এন্ডপয়েন্ট
+// ডাউনলোড এন্ডপয়েন্ট
 app.get('/download/:fileId', async (req, res) => {
   try {
     const fileRes = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${req.params.fileId}`);
@@ -110,7 +115,7 @@ app.get('/download/:fileId', async (req, res) => {
   }
 });
 
-// চ্যানেল থেকে মেসেজ ডিলিট করার API
+// ডিলিট মেসেজ API
 app.post('/api/delete', async (req, res) => {
   const { messageId } = req.body;
   if (!messageId) return res.status(400).json({ error: 'Message ID required' });
