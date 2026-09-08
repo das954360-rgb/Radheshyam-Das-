@@ -366,21 +366,23 @@
       }
     }
 
-    async function deleteFile(messageId, cardId) {
+    // চ্যাট আইডি ও সঠিক এরর মেসেজ হ্যান্ডলিং সহ ডিলিট ফাংশন
+    async function deleteFile(messageId, chatId, cardId) {
       if (!confirm('Are you sure you want to delete this file from Telegram?')) return;
 
       try {
         const res = await fetch('/api/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messageId })
+          body: JSON.stringify({ messageId, chatId })
         });
         const result = await res.json();
         if (result.success) {
           document.getElementById(cardId)?.remove();
           filesData = filesData.filter(f => f.messageId !== messageId);
         } else {
-          alert('Failed to delete. Check bot admin rights.');
+          // টেলিগ্রামের দেওয়া আসল এরর দেখাবে
+          alert('Telegram Error: ' + (result.error || 'Failed to delete'));
         }
       } catch (e) {
         alert('Server communication error.');
@@ -395,7 +397,7 @@
 
       let sorted = [...displayList];
       if (sortType === 'newest') {
-        // Already newest first
+        // Newest first
       } else if (sortType === 'oldest') {
         sorted.reverse();
       } else if (sortType === 'name-asc') {
@@ -460,7 +462,7 @@
               <div class="action-buttons">
                 ${playBtnHTML}
                 <a class="btn btn-download" href="/download/${f.id}">⬇ Download</a>
-                <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${cardId}')">🗑 Delete</button>
+                <button class="btn btn-delete" onclick="deleteFile(${f.messageId}, '${f.chatId}', '${cardId}')">🗑 Delete</button>
               </div>
             </div>
           </div>
